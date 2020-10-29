@@ -2,32 +2,50 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
 	"strings"
+	"time"
 )
 
-var defaultProblemsFile = "problems.csv"
+var problemsFile string
+var timeout uint
 
 func main() {
-	var correctAnswers int
-	var wrongAnswers int
+	flag.StringVar(&problemsFile, "problems", "problems.csv", "Provide a path to csv file")
+	flag.UintVar(&timeout, "timeout", 30, "Timeout for a quiz game")
+	flag.Parse()
 
 	// Read problems csv
-	fileBytes, err := ioutil.ReadFile(defaultProblemsFile)
-	f := os.Stdin
-	scanner := bufio.NewScanner(f)
-	defer f.Close()
+	fileBytes, err := ioutil.ReadFile(problemsFile)
 
-	// Conuld not read problems file
+	// Could not read problems file
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	content := fmt.Sprintf("%s", fileBytes)
 	rows := strings.Split(content, "\n")
+
+	correctAnswers, wrongAnswers := startQuiz(rows)
+
+	fmt.Printf("You had [%d] corrent answers and [%d] wrong answers", correctAnswers, wrongAnswers)
+}
+
+func startQuiz(rows []string) (correctAnswers uint, wrongAnswers uint) {
+	f := os.Stdin
+	defer f.Close()
+	scanner := bufio.NewScanner(f)
+	totalQuestions := uint(len(rows))
+
+	fmt.Printf("You have %d seconds to complete quiz with %d questions in it, press any key to continue", timeout, totalQuestions)
+	scanner.Scan()
+
+	timer := time.NewTimer(time.Duration(timeout) * time.Second)
+	answerChanel := make(chan string)
 
 	for _, row := range rows {
 		questionAndAnswer := strings.Split(row, ",")
@@ -36,15 +54,22 @@ func main() {
 
 		fmt.Printf("What is %s?\n", question)
 
-		scanner.Scan()
-		userInput := string(scanner.Text())
+		go func() {
+			scanner.Scan()
+			userInput := strings.TrimSpace(scanner.Text())
 
-		if userInput == answer {
-			correctAnswers++
-		} else {
-			wrongAnswers++
+			answerChanel <- userInput
+		}()
+
+		select {
+		case <-timer.C:
+			return correctAnswers, totalQuestions - correctAnswers
+		case userInput := <-answerChanel:
+			if userInput == answer {
+				correctAnswers++
+			}
 		}
 	}
 
-	fmt.Printf("You had [%d] corrent answers and [%d] wrong answers", correctAnswers, wrongAnswers)
+	return correctAnswers, totalQuestions - correctAnswers
 }
