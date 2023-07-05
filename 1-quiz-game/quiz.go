@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"strings"
@@ -20,14 +19,14 @@ func main() {
 	flag.Parse()
 
 	// Read problems csv
-	fileBytes, err := ioutil.ReadFile(problemsFile)
+	fileBytes, err := os.ReadFile(problemsFile)
 
 	// Could not read problems file
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	content := fmt.Sprintf("%s", fileBytes)
+	content := string(fileBytes)
 	rows := strings.Split(content, "\n")
 
 	correctAnswers, wrongAnswers := startQuiz(rows)
